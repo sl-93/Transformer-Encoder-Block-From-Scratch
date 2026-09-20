@@ -364,7 +364,7 @@ source .venv/bin/activate
 ### 3. Install dependencies
 
 ```bash
-pip install torch
+pip install requirements.txt
 ```
 
 ### 4. Run the project
