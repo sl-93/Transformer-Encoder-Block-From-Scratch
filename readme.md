@@ -323,10 +323,10 @@ Transformer-Encoder-Block-From-Scratch/
 ├── blocks/
 │   ├── attention.py
 │   ├── feed_forward.py
-│   └── transformer_encoder_block.py
-│
-├── encoder.py
+│   ├── positional_encoding.py
+│   └── encoder.py
 ├── main.py
+├── requirements.txt
 └── README.md
 ```
 
@@ -471,7 +471,6 @@ This repository currently focuses on understanding a single Transformer Encoder 
 
 Possible extensions include:
 
-* [ ] Add positional encoding
 * [ ] Implement a complete Transformer Encoder
 * [ ] Stack multiple encoder blocks
 * [ ] Add dropout
