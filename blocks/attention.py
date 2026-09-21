@@ -25,7 +25,6 @@ class SelfAttention(nn.Module):
     def forward(self, x):
 
         batch_size, seq_len, _ = x.shape
-
         Q = self.W_q(x)
         K = self.W_k(x)
         V = self.W_v(x)
