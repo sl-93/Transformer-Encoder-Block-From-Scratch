@@ -55,6 +55,16 @@ class SelfAttention(nn.Module):
         scores = scores / (self.head_dim ** 0.5)
 
         # --------------------------------
+        # Causal mask
+        # --------------------------------
+        mask = torch.tril(torch.ones(seq_len,
+                                     seq_len,
+                                     device=x.device))
+
+        scores = scores.masked_fill(mask == 0,
+                                    float("-inf"))
+
+        # --------------------------------
         # Attention weights
         # --------------------------------
         weights = F.softmax(scores, dim=-1)
