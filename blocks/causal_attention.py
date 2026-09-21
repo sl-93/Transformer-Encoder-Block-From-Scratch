@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SelfAttention(nn.Module):
+class CausalSelfAttention(nn.Module):
 
     def __init__(self, 
                  d_model, 
@@ -19,7 +19,7 @@ class SelfAttention(nn.Module):
         self.W_q = nn.Linear(d_model, d_model)
         self.W_k = nn.Linear(d_model, d_model)
         self.W_v = nn.Linear(d_model, d_model)
-
+        
         self.W_o = nn.Linear(d_model, d_model)
 
     def forward(self, x):
@@ -53,6 +53,16 @@ class SelfAttention(nn.Module):
         scores = Q @ K.transpose(-2, -1)
 
         scores = scores / (self.head_dim ** 0.5)
+
+        # --------------------------------
+        # Causal mask
+        # --------------------------------
+        mask = torch.tril(torch.ones(seq_len,
+                                     seq_len,
+                                     device=x.device))
+
+        scores = scores.masked_fill(mask == 0,
+                                    float("-inf"))
 
         # --------------------------------
         # Attention weights
