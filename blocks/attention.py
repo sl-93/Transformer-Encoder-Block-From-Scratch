@@ -30,7 +30,9 @@ class SelfAttention(nn.Module):
         K = self.W_k(x)
         V = self.W_v(x)
 
-        # Split into heads
+        # --------------------------------
+        # Split heads
+        # --------------------------------
         Q = Q.view(batch_size,
                    seq_len,
                    self.num_heads,
@@ -46,16 +48,36 @@ class SelfAttention(nn.Module):
                    self.num_heads,
                    self.head_dim).transpose(1, 2)
 
+        # --------------------------------
         # Attention scores
+        # --------------------------------
         scores = Q @ K.transpose(-2, -1)
 
         scores = scores / (self.head_dim ** 0.5)
 
+        # --------------------------------
+        # Causal mask
+        # --------------------------------
+        mask = torch.tril(torch.ones(seq_len,
+                                     seq_len,
+                                     device=x.device))
+
+        scores = scores.masked_fill(mask == 0,
+                                    float("-inf"))
+
+        # --------------------------------
+        # Attention weights
+        # --------------------------------
         weights = F.softmax(scores, dim=-1)
 
+        # --------------------------------
+        # Weighted values
+        # --------------------------------
         output = weights @ V
 
+        # --------------------------------
         # Merge heads
+        # --------------------------------
         output = output.transpose(1, 2)
 
         output = output.contiguous().view(batch_size,
