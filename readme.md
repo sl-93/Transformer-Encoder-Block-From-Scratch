@@ -712,6 +712,3 @@ The goal is to answer questions such as:
 > How does the same model go from training to autoregressive generation?
 
 Rather than treating the Transformer as a black box, this repository builds it piece by piece to make its internal mechanics visible.
-
-
-
