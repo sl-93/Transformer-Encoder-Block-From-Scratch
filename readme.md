@@ -1,340 +1,569 @@
-# Transformer Encoder Block From Scratch
+# Transformer & GPT From Scratch
 
-<p align="center">
-  <b>A minimal, educational implementation of a Transformer Encoder Block using PyTorch</b>
-</p>
+A hands-on PyTorch implementation of Transformer components built **from scratch for learning and understanding Large Language Models (LLMs)**.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.x-blue?logo=python" />
-  <img src="https://img.shields.io/badge/PyTorch-2.x-ee4c2c?logo=pytorch" />
-  <img src="https://img.shields.io/badge/Transformer-From%20Scratch-orange" />
-  <img src="https://img.shields.io/badge/Deep%20Learning-LLMs-purple" />
-</p>
+This project started with a Transformer Encoder Block and has evolved into a small **GPT-style decoder-only language model**, covering the core concepts behind modern autoregressive LLMs.
+
+The goal is not to build a production-scale LLM, but to understand what happens **inside a Transformer — from token embeddings and attention all the way to training and text generation.**
 
 ---
 
-## 📌 Overview
+## 🚀 What This Project Covers
 
-This repository implements a **Transformer Encoder Block from scratch using PyTorch**, with the goal of understanding what happens inside a Transformer rather than treating it as a black-box architecture.
+### Transformer Foundations
 
-The implementation focuses on the core building blocks introduced in **[Attention Is All You Need](https://arxiv.org/abs/1706.03762)**:
-
-* Multi-Head Self-Attention
+* Token embeddings
+* Positional encoding
 * Query, Key, and Value projections
-* Scaled Dot-Product Attention
-* Residual Connections
+* Scaled dot-product attention
+* Multi-head self-attention
+* Residual connections
 * Layer Normalization
-* Position-wise Feed-Forward Network
-* Tensor reshaping and multi-head computation
+* Feed-forward networks
+* Transformer Encoder Block
 
-The project is intentionally kept small and modular so that each operation can be followed directly from the input tensor to the final encoder output.
+### GPT / Decoder-Only Architecture
+
+* Causal self-attention
+* Causal masking
+* Transformer Decoder Block
+* Stacked decoder blocks
+* Final LayerNorm
+* Language Model (LM) head
+* Next-token prediction
+* Autoregressive text generation
+
+### Training
+
+* Character-level tokenization
+* Input/target sequence creation
+* Shifted targets for next-token prediction
+* Cross-entropy loss
+* Backpropagation
+* AdamW optimization
+* Mini-batch training
 
 ---
 
-## 🧠 Transformer Encoder Block
+## 🧠 Architecture
 
-A Transformer Encoder Block can be summarized as:
+The project currently contains both the original Transformer encoder components and a GPT-style decoder-only model.
+
+### Encoder Block
+
+The encoder block follows the classical Transformer structure:
 
 ```text
-                    Input X
-                       │
-                       ▼
-             ┌───────────────────┐
-             │ Multi-Head         │
-             │ Self-Attention     │
-             └─────────┬─────────┘
-                       │
-                       ▼
-                Residual Add
-                       │
-                       ▼
-                 LayerNorm
-                       │
-                       ▼
-             ┌───────────────────┐
-             │ Feed-Forward      │
-             │ Network (FFN)     │
-             └─────────┬─────────┘
-                       │
-                       ▼
-                Residual Add
-                       │
-                       ▼
-                 LayerNorm
-                       │
-                       ▼
-                    Output
+Input
+  │
+  ▼
+Multi-Head Self-Attention
+  │
+  ▼
+Residual + LayerNorm
+  │
+  ▼
+Feed-Forward Network
+  │
+  ▼
+Residual + LayerNorm
+  │
+  ▼
+Output
+```
+
+### GPT-Style Decoder Block
+
+The decoder block replaces standard self-attention with **causal self-attention**, preventing each token from attending to future tokens.
+
+```text
+Input
+  │
+  ▼
+Causal Self-Attention
+  │
+  ▼
+Residual + LayerNorm
+  │
+  ▼
+Feed-Forward Network
+  │
+  ▼
+Residual + LayerNorm
+  │
+  ▼
+Output
+```
+
+### Complete GPT Model
+
+```text
+Token IDs
+   │
+   ▼
+Token Embedding
+   │
+   ▼
+Positional Encoding
+   │
+   ▼
+Decoder Block × N
+   │
+   ▼
+Final LayerNorm
+   │
+   ▼
+Language Model Head
+   │
+   ▼
+Logits
+   │
+   ▼
+Next Token
+```
+
+The current `GPTModel` implements token embeddings, positional encoding, a stack of decoder blocks, final normalization, and a vocabulary projection through the LM head.
+
+---
+
+## 🔍 Causal Self-Attention
+
+The GPT implementation uses a causal attention mask so that a token cannot see future tokens.
+
+For a sequence of length 5:
+
+```text
+1 0 0 0 0
+1 1 0 0 0
+1 1 1 0 0
+1 1 1 1 0
+1 1 1 1 1
+```
+
+The attention scores are masked before applying softmax:
+
+```python
+scores = scores.masked_fill(
+    mask == 0,
+    float("-inf")
+)
+```
+
+Since:
+
+```text
+softmax(-∞) = 0
+```
+
+future tokens receive zero attention probability.
+
+The implementation performs:
+
+```text
+Q = XWq
+K = XWk
+V = XWv
+
+        ↓
+
+QKᵀ / √dk
+
+        ↓
+
+Causal Mask
+
+        ↓
+
+Softmax
+
+        ↓
+
+Attention Weights × V
+
+        ↓
+
+Merge Heads
+
+        ↓
+
+Output Projection
+```
+
+The current implementation explicitly constructs the lower-triangular causal mask and applies it before softmax.
+
+---
+
+## 🎯 Next-Token Prediction
+
+The model is trained as an autoregressive language model.
+
+Given:
+
+```text
+hello machine learning
+```
+
+the training examples are shifted by one token:
+
+```text
+Input:
+
+hello machine learning
+```
+
+```text
+Target:
+
+machine learning ...
 ```
 
 Conceptually:
 
-$$
-X \rightarrow MHA(X) \rightarrow Add+Norm
-\rightarrow FFN \rightarrow Add+Norm
-$$
+```text
+"I"              → "love"
+"I love"         → "machine"
+"I love machine" → "learning"
+```
+
+For a model output of:
+
+```text
+(B, S, vocab_size)
+```
+
+the target tensor has shape:
+
+```text
+(B, S)
+```
+
+Each target value is simply the ID of the correct next token.
 
 ---
 
-## 🔍 What Happens Inside?
+## 📐 Tensor Shapes
 
-### 1. Input
-
-The encoder receives a sequence of token representations:
-
-$$
-X \in \mathbb{R}^{B \times S \times D}
-$$
-
-where:
-
-* \(B\) = batch size
-* \(S\) = sequence length
-* \(D\) = model dimension (`d_model`)
-
-For example:
+For example, with:
 
 ```text
-X = (32, 100, 512)
+Batch size       = 2
+Sequence length  = 6
+d_model          = 512
+Number of heads  = 8
+Vocabulary size  = 50,000
 ```
 
-means:
+the main tensors have the following shapes:
 
 ```text
-32   → batch size
-100  → sequence length
-512  → embedding/model dimension
-```
+Input IDs
+(B, S)
+(2, 6)
 
----
+       ↓
 
-### 2. Query, Key, and Value
+Token Embeddings
+(B, S, d_model)
+(2, 6, 512)
 
-The input is projected into three representations:
+       ↓
 
-$$
-Q = XW_Q
-$$
+Q / K / V
+(B, S, d_model)
 
-$$
-K = XW_K
-$$
+       ↓
 
-$$
-V = XW_V
-$$
+Split Heads
+(B, num_heads, S, head_dim)
 
-These projections allow the model to learn different roles for the same token representation.
+(2, 8, 6, 64)
 
-* **Query (Q):** What information am I looking for?
-* **Key (K):** What information do I contain / how should I be matched?
-* **Value (V):** What information should actually be passed forward?
+       ↓
 
----
+Attention Scores
+(B, num_heads, S, S)
 
-### 3. Multi-Head Attention
+(2, 8, 6, 6)
 
-Instead of performing one large attention operation, the model divides the representation into multiple attention heads.
+       ↓
 
-For:
-
-```text
-d_model = 512
-num_heads = 8
-```
-
-each head operates on:
-
-$$
-d_{head} = \frac{512}{8} = 64
-$$
-
-After reshaping:
-
-```text
-Before splitting heads:
-
-Q → (B, S, 512)
-
-After splitting heads:
-
-Q → (B, 8, S, 64)
-```
-
-The same transformation is applied to `K` and `V`.
-
----
-
-### 4. Scaled Dot-Product Attention
-
-Each attention head calculates:
-
-$$
-Attention(Q,K,V)
-=
-softmax
-\left(
-\frac{QK^T}{\sqrt{d_k}}
-\right)V
-$$
-
-The implementation follows these steps:
-
-```text
-Q @ Kᵀ
-      ↓
-Scale by √dₖ
-      ↓
-Softmax
-      ↓
-Attention Weights
-      ↓
-Weights @ V
-      ↓
 Attention Output
+(B, num_heads, S, head_dim)
+
+(2, 8, 6, 64)
+
+       ↓
+
+Merge Heads
+(B, S, d_model)
+
+(2, 6, 512)
+
+       ↓
+
+LM Head
+
+(B, S, vocab_size)
+
+(2, 6, 50,000)
+```
+
+The final tensor contains a vocabulary score for every position in every sequence.
+
+---
+
+## 📉 Training
+
+The project includes a complete training loop.
+
+The basic training process is:
+
+```text
+Input IDs
+    │
+    ▼
+GPT Model
+    │
+    ▼
+Logits
+    │
+    ▼
+Cross-Entropy Loss
+    │
+    ▼
+Backward Pass
+    │
+    ▼
+Gradients
+    │
+    ▼
+AdamW
+    │
+    ▼
+Updated Parameters
+```
+
+The core training step is:
+
+```python
+input_ids, targets = get_batch(batch_size)
+
+logits = model(input_ids)
+
+loss = F.cross_entropy(
+    logits.reshape(-1, vocab_size),
+    targets.reshape(-1)
+)
+
+optimizer.zero_grad()
+loss.backward()
+optimizer.step()
 ```
 
 For example:
 
 ```text
-Q          → (B, H, S, Dₕ)
-K          → (B, H, S, Dₕ)
+logits:
+(B, S, V)
+    ↓
+(B × S, V)
 
-Q @ Kᵀ     → (B, H, S, S)
-
-Weights @ V
-           → (B, H, S, Dₕ)
+targets:
+(B, S)
+    ↓
+(B × S)
 ```
 
-This is the core mechanism that allows every token to interact with other tokens in the sequence.
+This allows `CrossEntropyLoss` to treat every token position as an individual next-token prediction problem.
 
 ---
 
-## 🔄 Residual Connections
+## 🧪 Dataset
 
-After attention, the original input is added back:
-
-$$
-X' = X + Attention(X)
-$$
-
-This is called a **residual connection**.
-
-It provides a direct path for information and gradients through the network and makes deeper Transformer architectures easier to optimize.
-
----
-
-## 📏 Layer Normalization
-
-The residual output is normalized:
-
-$$
-Y = LayerNorm(X')
-$$
-
-LayerNorm operates across the feature dimension of each token representation.
-
-The simplified process is:
-
-$$
-\mu = \frac{1}{D}\sum_i x_i
-$$
-
-$$
-\sigma^2 =
-\frac{1}{D}\sum_i(x_i-\mu)^2
-$$
-
-$$
-\hat{x} =
-\frac{x-\mu}
-{\sqrt{\sigma^2+\epsilon}}
-$$
-
-followed by learnable scale and shift parameters.
-
----
-
-## ⚡ Feed-Forward Network
-
-After attention, each token independently passes through a feed-forward network:
-
-$$
-FFN(x)
-=
-W_2\,ReLU(W_1x+b_1)+b_2
-$$
-
-A typical configuration is:
+The current example uses a small character-level dataset:
 
 ```text
-d_model = 512
-d_ff    = 2048
+hello world
+hello machine learning
+hello transformer
+machine learning is powerful
+transformers are powerful
+machine learning is interesting
 ```
 
-So the transformation becomes:
+A simple character tokenizer converts the text into integer token IDs.
+
+For example:
 
 ```text
-512
+text
  ↓
-2048
+characters
  ↓
-512
+integer IDs
+ ↓
+embedding
+ ↓
+Transformer
 ```
 
-An important distinction is:
-
-> **Attention mixes information between tokens, while the FFN transforms each token representation independently.**
+The character-level tokenizer is intentionally simple so that the focus remains on understanding the Transformer architecture and training process rather than on implementing a sophisticated tokenizer.
 
 ---
 
-## 🔁 Complete Encoder Block
+## ✍️ Text Generation
 
-The complete computation can therefore be represented as:
+After training, the model can generate text autoregressively.
 
-$$
-X_1 = LayerNorm(X + MHA(X))
-$$
-
-$$
-X_2 = LayerNorm(X_1 + FFN(X_1))
-$$
-
-where:
-
-* `MHA` = Multi-Head Attention
-* `FFN` = Feed-Forward Network
-
-The final output has the same shape as the input:
+For example:
 
 ```text
-Input  → (B, S, D)
-Output → (B, S, D)
+Prompt:
+
+hello
 ```
 
-This makes Transformer blocks composable: multiple blocks can be stacked on top of each other.
+The model predicts one token:
+
+```text
+hello m
+```
+
+Then the new token is added to the context:
+
+```text
+hello m...
+```
+
+and the model predicts another token.
+
+This continues until the requested number of new tokens has been generated.
+
+The generation process therefore looks like:
+
+```text
+Prompt
+  │
+  ▼
+GPT
+  │
+  ▼
+Predict next token
+  │
+  ▼
+Append token
+  │
+  ▼
+GPT again
+  │
+  ▼
+Predict next token
+  │
+  ▼
+...
+```
+
+The implementation takes the logits corresponding to the **last sequence position**, converts them to probabilities with softmax, samples the next token, and appends it to the sequence.
 
 ---
 
-## 🏗️ Project Structure
+## 📁 Project Structure
 
 ```text
 Transformer-Encoder-Block-From-Scratch/
 │
 ├── blocks/
 │   ├── attention.py
+│   ├── causal_attention.py
+│   ├── decoder.py
 │   ├── feed_forward.py
 │   ├── positional_encoding.py
-│   └── encoder.py
+│   ├── encoder.py
+│   └── simple_GPT.py
+│
 ├── main.py
-├── requirements.txt
 └── README.md
 ```
 
-The implementation is deliberately separated into smaller components so that the flow of data through the architecture is easy to inspect.
+### `blocks/attention.py`
+
+Implements standard self-attention and multi-head attention components.
+
+### `blocks/causal_attention.py`
+
+Implements causal self-attention for autoregressive language modeling, including:
+
+* Q/K/V projections
+* Multi-head splitting
+* Scaled dot-product attention
+* Causal masking
+* Softmax
+* Weighted values
+* Head merging
+
+### `blocks/decoder.py`
+
+Implements the GPT-style Transformer Decoder Block:
+
+```text
+Causal Self-Attention
+        ↓
+Residual + LayerNorm
+        ↓
+Feed Forward
+        ↓
+Residual + LayerNorm
+```
+
+### `blocks/feed_forward.py`
+
+Implements the Transformer feed-forward network:
+
+```text
+d_model
+   ↓
+d_ff
+   ↓
+ReLU
+   ↓
+d_model
+```
+
+### `blocks/positional_encoding.py`
+
+Implements sinusoidal positional encoding.
+
+### `blocks/simple_GPT.py`
+
+Combines the components into a complete GPT-style model:
+
+```text
+Embedding
+→ Positional Encoding
+→ Decoder Blocks
+→ LayerNorm
+→ LM Head
+```
+
+### `main.py`
+
+Contains the end-to-end example:
+
+* Dataset
+* Character tokenizer
+* Batch creation
+* Model initialization
+* Training loop
+* Cross-entropy loss
+* Backpropagation
+* AdamW
+* Text generation
+
+The current `main.py` uses a small character-level dataset, a 2-layer model with `d_model=128`, 4 attention heads, `d_ff=512`, and trains for 1000 steps.
 
 ---
 
-## 🚀 Getting Started
+## ▶️ Running the Project
 
 ### 1. Clone the repository
 
@@ -343,143 +572,146 @@ git clone https://github.com/sl-93/Transformer-Encoder-Block-From-Scratch.git
 cd Transformer-Encoder-Block-From-Scratch
 ```
 
-### 2. Create a virtual environment
+### 2. Install PyTorch
 
 ```bash
-python -m venv .venv
+pip install torch
 ```
 
-Activate it on Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-Or on Linux/macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install requirements.txt
-```
-
-### 4. Run the project
+### 3. Run the training script
 
 ```bash
 python main.py
 ```
 
----
-
-## 📐 Example Tensor Flow
-
-For:
+You should see output similar to:
 
 ```text
-Batch Size  = 32
-Sequence    = 100
-d_model     = 512
-Heads       = 8
-d_head      = 64
+Device: cpu
+Vocabulary size: ...
+Dataset size: ...
+
+Step    0 | Loss: ...
+Step  100 | Loss: ...
+Step  200 | Loss: ...
+...
+Step  900 | Loss: ...
+
+Generated text:
+hello ...
 ```
 
-the main tensor transformations are:
-
-```text
-Input
-(B, S, D)
-    │
-    ▼
-Q, K, V projections
-(B, S, 512)
-    │
-    ▼
-Split into heads
-(B, 8, 100, 64)
-    │
-    ▼
-Q @ Kᵀ
-(B, 8, 100, 100)
-    │
-    ▼
-Softmax
-(B, 8, 100, 100)
-    │
-    ▼
-Attention × V
-(B, 8, 100, 64)
-    │
-    ▼
-Merge heads
-(B, 100, 512)
-    │
-    ▼
-Residual + LayerNorm
-(B, 100, 512)
-    │
-    ▼
-Feed-Forward Network
-(B, 100, 512)
-    │
-    ▼
-Residual + LayerNorm
-(B, 100, 512)
-```
-
-Understanding these shape transformations is one of the main goals of this project.
+The exact loss and generated text will vary because the model is randomly initialized and the batches are sampled randomly.
 
 ---
 
-## 🎯 Learning Objectives
+## 📚 Learning Progression
 
-This project was built to develop a deeper understanding of Transformer internals by implementing the architecture directly rather than relying on high-level Transformer APIs.
+This repository is being developed incrementally to understand Transformers from the inside out.
 
-By studying this repository, you can understand:
+### Day 1 — Attention
 
-* How Q, K, and V are generated
-* Why Q and K are transposed during attention
-* Why attention scores have shape `(S, S)`
-* Why attention is scaled by \(\sqrt{d_k}\)
-* How multiple attention heads work
-* How tensors are reshaped and transposed
-* How residual connections work
-* What LayerNorm actually does
-* Why the FFN expands and contracts the representation
-* How the different components form a complete Transformer block
+* Q, K, V
+* Scaled dot-product attention
+* Attention scores
+* Attention weights
 
----
+### Day 2 — Transformer Encoder
 
-## 📚 Reference
+* Multi-head attention
+* Residual connections
+* LayerNorm
+* Feed-forward networks
+* Encoder block
 
-This implementation is based on the Transformer architecture introduced in:
+### Day 3 — Transformer Input
 
-> Vaswani et al., **"Attention Is All You Need"**, 2017.
+* Token IDs
+* Embeddings
+* Positional encoding
+* Transformer input pipeline
 
-The original paper introduced the Transformer architecture and the self-attention mechanism that forms the foundation of modern Transformer-based language models.
+### Day 4 — Causal Attention
 
-📄 Paper: https://arxiv.org/abs/1706.03762
+* Decoder-only architecture
+* Causal masking
+* Autoregressive prediction
+* GPT-style attention
 
----
+### Day 5 — GPT Training
 
-## 🔮 Future Improvements
+* Decoder blocks
+* GPT model
+* Character-level tokenization
+* Input/target shifting
+* Logits
+* Cross-entropy
+* Backpropagation
+* AdamW
+* Text generation
 
-This repository currently focuses on understanding a single Transformer Encoder Block.
+### Next Steps
 
-Possible extensions include:
+Planned improvements include:
 
-* [ ] Implement a complete Transformer Encoder
-* [ ] Stack multiple encoder blocks
-* [ ] Add dropout
-* [ ] Add attention visualization
-* [ ] Implement the original sinusoidal positional encoding
+* [ ] Train on a larger text corpus
+* [ ] Implement a better tokenizer
+* [ ] Add temperature sampling
+* [ ] Add top-k sampling
+* [ ] Add model checkpointing
+* [ ] Add validation loss
+* [ ] Add train/validation split
+* [ ] Implement Pre-LN architecture
+* [ ] Implement RMSNorm
 * [ ] Implement RoPE
-* [ ] Implement a Transformer Decoder
-* [ ] Implement causal self-attention
-* [ ] Build a complete encoder-decoder Transformer
-* [ ] Train a small Transformer on a real dataset
-* [ ] Extend the implementation toward a small language model
+* [ ] Implement KV cache
+* [ ] Add attention visualization
+* [ ] Add model evaluation
+* [ ] Experiment with larger GPT configurations
+
+---
+
+## 📖 References
+
+* Vaswani et al., **Attention Is All You Need**
+* Radford et al., **Improving Language Understanding by Generative Pre-Training**
+* Brown et al., **Language Models are Few-Shot Learners**
+* Andrej Karpathy, **Let's build GPT from scratch**
+* Sebastian Raschka, **Build a Large Language Model (From Scratch)**
+
+---
+
+## 🎯 Purpose
+
+This project is primarily an **educational implementation**.
+
+The code intentionally favors:
+
+* readability
+* explicit tensor operations
+* simple architecture
+* minimal abstraction
+* understanding over performance
+
+The goal is to answer questions such as:
+
+> What exactly happens to a token after it enters a Transformer?
+
+> How are Q, K, and V calculated?
+
+> How does causal masking work?
+
+> Why does the model output `(B, S, vocab_size)` logits?
+
+> How are the targets constructed?
+
+> How is cross-entropy calculated?
+
+> How does backpropagation update the Transformer parameters?
+
+> How does the same model go from training to autoregressive generation?
+
+Rather than treating the Transformer as a black box, this repository builds it piece by piece to make its internal mechanics visible.
+
+
 
